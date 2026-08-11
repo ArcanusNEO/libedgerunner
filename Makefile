@@ -28,7 +28,8 @@ clean:
 	$(COMPILE.c) -MM $< -o $@
 
 extern: cmacs.h extern/yyjson.h
-	@install -d bin etc include lib share src extern
+	@install -d bin etc include lib share src $@
+	@touch $@
 
 cmacs.h:
 	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h  || (rm -f $@ && false)
