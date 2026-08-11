@@ -1,5 +1,5 @@
 MAKEFLAGS += -r
-.PHONY: all clean extern yyjson
+.PHONY: all clean yyjson
 .SUFFIXES: .c .o .d
 SRC := $(shell find . -path src -prune -o -type f -name "*.c")
 OBJ := $(patsubst %.c, %.o, $(SRC))
@@ -24,16 +24,17 @@ clean:
 	$(RM) -- $(OBJ) $(DEP) main
 
 -include $(DEP)
-%.d: %.c cmacs.h extern
+%.d: %.c extern
 	$(COMPILE.c) -MM $< -o $@
 
-cmacs.h:
-	$(WGET) -O $@ -- "https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h"  || (rm -f -- $@ && false)
-
-extern: yyjson
+extern: cmacs.h extern/yyjson.h
 	@install -d bin etc include lib share src extern
-yyjson:
+
+cmacs.h:
+	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h  || (rm -f $@ && false)
+
+extern/yyjson.h:
 	@install -d extern
-	$(WGET) -P extern -- "https://raw.github.com/ibireme/yyjson/master/src/yyjson.{c,h}" || (rm -f -- extern/yyjson.{c,h} && false)
+	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{c,h} || (rm -f extern/yyjson.{c,h} && false)
 
 .SECONDARY: $(OBJ)
