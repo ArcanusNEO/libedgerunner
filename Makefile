@@ -1,6 +1,7 @@
 MAKEFLAGS += -r
-.PHONY: all clean yyjson
+.PHONY: all clean
 .SUFFIXES: .c .o .d
+EXT := cmacs.h extern/yyjson.h extern/yyjson.c
 SRC := $(shell find . -path src -prune -o -type f -name "*.c")
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
@@ -24,17 +25,16 @@ clean:
 	$(RM) -- $(OBJ) $(DEP) main
 
 -include $(DEP)
-%.d: %.c extern
+%.d: %.c $(EXT)
 	$(COMPILE.c) -MM $< -o $@
 
-extern: cmacs.h extern/yyjson.h
-	@install -d bin etc include lib share src $@
+extern: $(EXT)
 
 cmacs.h:
 	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h  || (rm -f $@ && false)
 
-extern/yyjson.h:
+extern/yyjson.h extern/yyjson.c&:
 	@install -d extern
-	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{c,h} || (rm -f extern/yyjson.{c,h} && false)
+	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || (rm -f extern/yyjson.{h,c} && false)
 
 .SECONDARY: $(OBJ)
