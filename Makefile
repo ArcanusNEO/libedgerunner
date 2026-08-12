@@ -29,6 +29,7 @@ clean:
 	$(COMPILE.c) -MM $< -o $@
 
 extern: $(EXT)
+	@install -d $@
 
 cmacs.h:
 	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h  || (rm -f $@ && false)
