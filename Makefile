@@ -1,7 +1,7 @@
 MAKEFLAGS += -r
 .PHONY: all clean extern
 .SUFFIXES: .c .o .d
-SRC := $(shell find . -path ./src -prune -o -type f -name "*.c")
+SRC := $(shell find . -path ./src -prune -o -type f -name "*.c" -print)
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
