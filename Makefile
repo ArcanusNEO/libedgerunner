@@ -32,10 +32,30 @@ extern: $(EXT)
 	@install -d $@
 
 cmacs.h:
-	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h  || (rm -f $@ && false)
+	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h || (rm -f $@ && false)
 
 extern/yyjson.h extern/yyjson.c&:
 	@install -d extern
 	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || (rm -f $@ && false)
+
+lib/libr3.a:
+	@$(WGET) -- 'https://api.github.com/repos/c9s/r3/tarball' || (rm -f -- tarball && false)
+	@install -d src/r3
+	@tar -xf tarball -C src/r3 --strip-components=1
+	@rm -rf -- tarball
+	@src/r3/autogen.sh
+	@src/r3/configure \
+		--prefix=$(CURDIR) \
+		--disable-shared \
+		--enable-static \
+		--disable-dependency-tracking \
+		--disable-graphviz \
+		--disable-json \
+		--disable-check \
+		--disable-debug \
+		--disable-gcov \
+		--without-malloc
+	@(MAKE) -C src/r3
+	@(MAKE) -C src/r3 install
 
 .SECONDARY: $(OBJ)
