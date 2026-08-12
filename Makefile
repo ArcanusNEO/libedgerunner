@@ -29,22 +29,22 @@ clean:
 	$(COMPILE.c) -MM $< -o $@
 
 extern: $(EXT)
-	@install -d $@
+	install -d $@
 
 cmacs.h:
-	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h || (rm -f $@ && false)
+	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h || ($(RM) $@ && false)
 
 extern/yyjson.h extern/yyjson.c&:
-	@install -d extern
-	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || (rm -f $@ && false)
+	install -d extern
+	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || ($(RM) $@ && false)
 
 lib/libr3.a:
-	@$(WGET) -- 'https://api.github.com/repos/c9s/r3/tarball' || (rm -f -- tarball && false)
-	@install -d src/r3
-	@tar -xf tarball -C src/r3 --strip-components=1
-	@rm -rf -- tarball
-	@cd src/r3 && ./autogen.sh
-	@cd src/r3 && ./configure \
+	install -d src/r3 lib
+	@$(WGET) -O r3.tar.gz https://api.github.com/repos/c9s/r3/tarball || ($(RM) r3.tar.gz && false)
+	@tar -xf r3.tar.gz -C src/r3 --strip-components=1
+	@$(RM) r3.tar.gz
+	cd src/r3 && ./autogen.sh
+	cd src/r3 && ./configure \
 		--prefix=$(CURDIR) \
 		--disable-shared \
 		--enable-static \
@@ -55,6 +55,6 @@ lib/libr3.a:
 		--disable-debug \
 		--disable-gcov \
 		--without-malloc
-	@cd src/r3 && make -j2 && make install
+	cd src/r3 && make -j2 && make install
 
 .SECONDARY: $(OBJ)
