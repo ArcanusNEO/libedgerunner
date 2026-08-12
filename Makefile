@@ -6,7 +6,7 @@ OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
 EXT := cmacs.h extern/yyjson.h extern/yyjson.c
-WGET := wget -qc --show-progress -t 3 --waitretry=
+WGET := wget -qc --show-progress -t 3 --waitretry=3
 
 CFLAGS ?= -O2 -fno-plt -pipe -flto=auto
 CFLAGS += -pthread -D_REENTRANT -fwrapv -fms-extensions -Wall -Wvla -Wno-parentheses -Wno-microsoft -I$(CURDIR) -I$(CURDIR)/extern -I$(CURDIR)/include
