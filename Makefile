@@ -55,7 +55,7 @@ lib/libr3.a:
 		--disable-debug \
 		--disable-gcov \
 		--without-malloc
-	@(MAKE) -C src/r3
-	@(MAKE) -C src/r3 install
+	@$(MAKE) -C src/r3
+	@$(MAKE) -C src/r3 install
 
 .SECONDARY: $(OBJ)
