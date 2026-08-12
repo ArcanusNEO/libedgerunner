@@ -43,8 +43,8 @@ lib/libr3.a:
 	@install -d src/r3
 	@tar -xf tarball -C src/r3 --strip-components=1
 	@rm -rf -- tarball
-	@src/r3/autogen.sh
-	@src/r3/configure \
+	@cd src/r3 && ./autogen.sh
+	@cd src/r3 && ./configure \
 		--prefix=$(CURDIR) \
 		--disable-shared \
 		--enable-static \
