@@ -1,12 +1,12 @@
 MAKEFLAGS += -r
 .PHONY: all clean
 .SUFFIXES: .c .o .d
-EXT := cmacs.h extern/yyjson.h extern/yyjson.c
 SRC := $(shell find . -path src -prune -o -type f -name "*.c")
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
-WGET := wget -qc --show-progress -t 3 --waitretry=3
+EXT := cmacs.h extern/yyjson.h extern/yyjson.c
+WGET := wget -qc --show-progress -t 3 --waitretry=
 
 CFLAGS ?= -O2 -fno-plt -pipe -flto=auto
 CFLAGS += -pthread -D_REENTRANT -fwrapv -fms-extensions -Wall -Wvla -Wno-parentheses -Wno-microsoft -I$(CURDIR) -I$(CURDIR)/extern -I$(CURDIR)/include
