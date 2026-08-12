@@ -36,6 +36,6 @@ cmacs.h:
 
 extern/yyjson.h extern/yyjson.c&:
 	@install -d extern
-	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || (rm -f extern/yyjson.{h,c} && false)
+	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || (rm -f $@ && false)
 
 .SECONDARY: $(OBJ)
