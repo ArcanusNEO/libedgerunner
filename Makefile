@@ -11,7 +11,8 @@ WGET := wget -qc --show-progress -t 3 --waitretry=3
 CFLAGS ?= -O3 -fno-plt -pipe -flto=auto
 CFLAGS += -pthread -D_REENTRANT -fwrapv -fms-extensions -Wall -Wvla -Wno-parentheses -Wno-microsoft -I$(CURDIR) -I$(CURDIR)/extern -I$(CURDIR)/include
 LDFLAGS ?= -Wl,-O1
-LDLIBS += -lm -lpthread -luv -lllhttp -lcaster
+LDFLAGS += -L$(CURDIR)/lib
+LDLIBS += -lm -lpthread -luv -lllhttp -lcaster -lr3
 
 all: main
 
