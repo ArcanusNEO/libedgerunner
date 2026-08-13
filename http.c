@@ -461,7 +461,7 @@ worker_main (void *arg)
 {
   struct worker *w = arg;
   w->result = serve (&w->loop, w->addr, UV_TCP_REUSEPORT);
-  pthread_exit (null);
+  return null;
 }
 
 int
