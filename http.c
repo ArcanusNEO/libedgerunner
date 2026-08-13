@@ -1,5 +1,15 @@
 #include "http.h"
 static llhttp_settings_t llhttp_settings;
+static struct router *http_router;
+
+/* One per event loop. The tree is private because r3_tree_matchl writes into
+ * per-node PCRE2 match data; match is reused so lookups do not allocate. */
+struct http_loop
+{
+  struct router_tree *tree;
+  struct router_match match;
+};
+
 static char *EMPTYCSTR = "";
 static char *H1_RESPONSE_400 = "HTTP/1.1 " HTTP_CODE_400 "\r\n"
                                "Connection: close\r\n"
@@ -105,14 +115,15 @@ enqueue_response (struct http_client *client, struct http_response *response)
 }
 
 static int
-http_response (struct http_client *client, char *header, byte *content,
-               usz length)
+http_response_ex (struct http_client *client, char *header, char *extra,
+                  byte const *content, usz length, bool body)
 {
   usz hsiz = strlen (header);
-  usz bufsiz = 16 + sizeof (H1) + hsiz + sizeof (H1_CONNECTION)
+  usz xsiz = extra ? strlen (extra) : 0;
+  usz bufsiz = 16 + sizeof (H1) + hsiz + xsiz + sizeof (H1_CONNECTION)
                + umax$ (sizeof ("keep-alive"), sizeof ("close"))
                + sizeof (H1_CONTENT_LENGTH) + sizeof (quote$ (SIZE_MAX))
-               + sizeof (H1_EOL) + length;
+               + sizeof (H1_EOL) + (body ? length : 0);
   struct http_response *r = malloc (sizeof (*r) + bufsiz);
   if (!r)
     return HPE_USER;
@@ -124,27 +135,204 @@ http_response (struct http_client *client, char *header, byte *content,
   memcpy (cur, header, hsiz);
   cur += hsiz;
   cur += sprintf (cur, H1_CONNECTION, r->keep_alive ? "keep-alive" : "close");
+  /* Content-Length always describes the selected representation, even when the
+   * body is suppressed for HEAD. */
   cur += sprintf (cur, H1_CONTENT_LENGTH, length);
+  if (xsiz)
+    {
+      memcpy (cur, extra, xsiz);
+      cur += xsiz;
+    }
   memcpy (cur, H1_EOL, sizeof (H1_EOL) - 1);
   cur += sizeof (H1_EOL) - 1;
-  memcpy (cur, content, length);
-  cur += length;
+  if (body && length)
+    {
+      memcpy (cur, content, length);
+      cur += length;
+    }
   r->write_buffer.len = cur - r->write_buffer.base;
   enqueue_response (client, r);
   return HPE_OK;
 }
 
+/* llhttp method -> ROUTE_* bit. Anything libr3 has no bit for maps to
+ * ROUTE_OTHER so it can only ever match a ROUTE_ANY route. */
+static int
+route_method (llhttp_method_t method)
+{
+  switch (method)
+    {
+    case HTTP_GET:
+      return ROUTE_GET;
+    case HTTP_POST:
+      return ROUTE_POST;
+    case HTTP_PUT:
+      return ROUTE_PUT;
+    case HTTP_DELETE:
+      return ROUTE_DELETE;
+    case HTTP_PATCH:
+      return ROUTE_PATCH;
+    case HTTP_HEAD:
+      return ROUTE_HEAD;
+    case HTTP_OPTIONS:
+      return ROUTE_OPTIONS;
+    default:
+      return ROUTE_OTHER;
+    }
+}
+
+static usz
+allow_header (int allowed, char *buffer, usz size)
+{
+  static struct
+  {
+    int bit;
+    char const *name;
+  } const table[] = {
+    { ROUTE_GET, "GET" },       { ROUTE_HEAD, "HEAD" },
+    { ROUTE_POST, "POST" },     { ROUTE_PUT, "PUT" },
+    { ROUTE_PATCH, "PATCH" },   { ROUTE_DELETE, "DELETE" },
+    { ROUTE_OPTIONS, "OPTIONS" },
+  };
+  char list[H1_ALLOW_MAX];
+  char *cur = list;
+  for (usz i = 0; i < countof (table); ++i)
+    {
+      if (!(allowed & table[i].bit))
+        continue;
+      if (cur != list)
+        {
+          *cur++ = ',';
+          *cur++ = ' ';
+        }
+      usz len = strlen (table[i].name);
+      memcpy (cur, table[i].name, len);
+      cur += len;
+    }
+  *cur = '\0';
+  if (cur == list)
+    return 0;
+  int written = snprintf (buffer, size, H1_ALLOW, list);
+  return written > 0 && (usz)written < size ? (usz)written : 0;
+}
+
+char const *
+http_capture (struct http_request const *request, char const *name,
+              usz *length)
+{
+  if (!request || !name)
+    return null;
+  usz want = strlen (name);
+  for (usz i = 0; i < request->capture_count; ++i)
+    {
+      struct router_capture const *capture = &request->capture[i];
+      if (capture->name_length != want || !capture->name
+          || memcmp (capture->name, name, want))
+        continue;
+      if (length)
+        *length = capture->value_length;
+      return capture->value;
+    }
+  if (length)
+    *length = 0;
+  return null;
+}
+
+int
+http_route (int methods, char const *path, http_handler handler)
+{
+  if (!handler)
+    return -1;
+  if (!http_router && !(http_router = router_create (null)))
+    return -1;
+  return router_add (http_router, methods, path, (void *)handler);
+}
+
+/* Dispatch happens here rather than in on_url_complete because a handler
+ * needs the method and body too, and llhttp only guarantees those by now. */
 static int
 on_message_complete (llhttp_t *parser)
 {
   struct http_client *client
       = container_of (parser, struct http_client, parser);
-  bsto *body = cstrbin$ (client->body);
-  if (!body)
-    return HPE_USER;
-  client->body = body;
-  char header[] = HTTP_CODE_200 H1_EOL;
-  return http_response (client, header, body->store, body->size);
+
+  char *path = "";
+  usz path_length = 0;
+  if (client->url)
+    {
+      bsto *url = cstrbin$ (client->url);
+      if (!url)
+        return HPE_USER;
+      client->url = url;
+      path = (char *)url->store;
+      path_length = url->size;
+    }
+  /* Route on the path only: strip query and fragment. */
+  usz stop = strcspn (path, "?#");
+  if (stop < path_length)
+    path_length = stop;
+
+  byte const *body = null;
+  usz body_length = 0;
+  if (client->body)
+    {
+      body = client->body->store;
+      body_length = client->body->size;
+    }
+
+  auto method = (llhttp_method_t)llhttp_get_method (parser);
+  struct http_loop *loop = client->loop;
+  struct router_match *match = &loop->match;
+
+  switch (router_lookup (loop->tree, route_method (method), path, path_length,
+                         match))
+    {
+    case ROUTER_FOUND:;
+      auto handler = (http_handler)match->data;
+      struct http_request request = {
+        .client = client,
+        .method = method,
+        .path = path,
+        .path_length = path_length,
+        .capture = match->capture,
+        .capture_count = match->capture_count,
+        .body = body,
+        .body_length = body_length,
+      };
+      struct http_reply reply = { .status = HTTP_CODE_200 };
+      handler (&request, &reply);
+      char extra[sizeof (H1_CONTENT_TYPE) + 128];
+      usz xlen = 0;
+      if (reply.content_type)
+        {
+          int written = snprintf (extra, sizeof (extra), H1_CONTENT_TYPE,
+                                  reply.content_type);
+          if (written > 0 && (usz)written < sizeof (extra))
+            xlen = written;
+        }
+      /* HEAD carries the same headers as GET but never a body. */
+      int rc = http_response_ex (client, (char *)reply.status,
+                                 xlen ? extra : null, reply.content,
+                                 reply.length, method != HTTP_HEAD);
+      if (reply.content_free)
+        reply.content_free (reply.content);
+      return rc;
+
+    case ROUTER_METHOD:;
+      char allow[sizeof (H1_ALLOW) + H1_ALLOW_MAX];
+      usz alen = allow_header (match->allowed, allow, sizeof (allow));
+      return http_response_ex (client, HTTP_CODE_405 H1_EOL,
+                               alen ? allow : null, null, 0, true);
+
+    case ROUTER_NOTFOUND:
+      return http_response_ex (client, HTTP_CODE_404 H1_EOL, null,
+                               (byte const *)"Not Found",
+                               sizeof ("Not Found") - 1,
+                               method != HTTP_HEAD);
+
+    default:
+      return HPE_USER;
+    }
 }
 
 static int
@@ -297,7 +485,6 @@ on_url_complete (llhttp_t *parser)
   if (!url)
     return HPE_USER;
   client->url = url;
-  /* TODO: route the request */
   clogger (DEBUG, (char *)url->store);
   return HPE_OK;
 }
@@ -401,6 +588,7 @@ on_connection (uv_stream_t *srv, int status)
   uv_tcp_init (srv->loop, &client->tcp_handle);
   if (uv_accept (srv, (uv_stream_t *)client))
     return uv_close ((uv_handle_t *)client, (uv_close_cb)free);
+  client->loop = srv->data;
   llhttp_init (&client->parser, HTTP_REQUEST, &llhttp_settings);
   client->response_queue.next = client->response_queue.prev
       = &client->response_queue;
@@ -419,7 +607,6 @@ init_static ()
   llhttp_settings.on_header_field = on_header_field;
   llhttp_settings.on_header_value = on_header_value;
   llhttp_settings.on_headers_complete = on_headers_complete;
-  llhttp_settings.on_url_complete = on_url_complete;
   llhttp_settings.on_body = on_body;
   llhttp_settings.on_message_complete = on_message_complete;
   inited = true;
@@ -430,22 +617,39 @@ init_static ()
 static int
 serve (uv_loop_t *loop, struct sockaddr const *addr, unsigned flags)
 {
+  /* Compile a tree per loop: sharing one across threads would race on the
+   * PCRE2 match data libr3 keeps inside each node. */
+  char *errstr = null;
+  struct http_loop context = { 0 };
+  if (!(context.tree = router_compile (http_router, &errstr)))
+    {
+      cerr ("route compilation failed:", errstr ? errstr : "out of memory");
+      free (errstr);
+      return 1;
+    }
+
   uv_tcp_t server;
   uv_tcp_init_ex (loop, &server, addr->sa_family);
+  server.data = &context;
   if (addr->sa_family == AF_INET6)
     {
       uv_os_fd_t fd;
       if (!uv_fileno ((uv_handle_t *)&server, &fd))
         setsockopt (fd, IPPROTO_IPV6, IPV6_V6ONLY, &(int){ 0 }, sizeof (int));
     }
+  int result;
   if (uv_tcp_bind (&server, addr, flags)
       || uv_listen ((uv_stream_t *)&server, 16384, on_connection))
     {
       uv_close ((uv_handle_t *)&server, null);
       uv_run (loop, UV_RUN_DEFAULT);
-      return 1;
+      result = 1;
     }
-  return uv_run (loop, UV_RUN_DEFAULT);
+  else
+    result = uv_run (loop, UV_RUN_DEFAULT);
+  router_match_release (&context.match);
+  router_tree_free (context.tree);
+  return result;
 }
 
 struct worker
@@ -469,6 +673,9 @@ http_listen (struct sockaddr const *addr, long threads)
 {
   signal (SIGPIPE, SIG_IGN);
   init_static ();
+  /* A server with no registered routes is legal: every request gets a 404. */
+  if (!http_router && !(http_router = router_create (null)))
+    return 1;
   if (threads <= 0)
     threads = uv_available_parallelism () + threads;
   if (threads <= 1)

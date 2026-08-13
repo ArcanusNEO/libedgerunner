@@ -3,6 +3,7 @@
 #define _H_HTTP_ 1
 
 #include "cmacs.h"
+#include "router.h"
 #include <grimoire.h>
 #include <llhttp.h>
 #include <uv.h>
@@ -77,6 +78,10 @@
 #define H1_CONNECTION "Connection: %s\r\n"
 #define H1_CONTENT_LENGTH "Content-Length: %zu\r\n"
 #define H1_CONTENT_TYPE "Content-Type: %s\r\n"
+#define H1_ALLOW "Allow: %s\r\n"
+
+/* Longest possible Allow value: every method name plus ", " separators. */
+#define H1_ALLOW_MAX sizeof ("GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS")
 
 struct http_header
 {
@@ -85,16 +90,57 @@ struct http_header
   char field[0];
 };
 
+/* Per-event-loop routing context, private to http.c. Each worker loop owns
+ * one: libr3 match state is mutated during matching and cannot be shared. */
+struct http_loop;
+
 struct http_client
 {
   uv_tcp_t tcp_handle;
   llhttp_t parser;
   struct lsnod response_queue;
+  struct http_loop *loop;
   bsto *url;
   bsto *header;
   bsto *body;
   bool closing : 1;
 };
+
+/* Handler contract: return an HTTP_CODE_* status line for the response body it
+ * writes into *content / *length. Ownership of *content stays with the
+ * handler unless *content_free is set. */
+struct http_request
+{
+  struct http_client *client;
+  llhttp_method_t method;
+  char const *path;
+  usz path_length;
+  struct router_capture const *capture;
+  usz capture_count;
+  byte const *body;
+  usz body_length;
+};
+
+struct http_reply
+{
+  char const *status;
+  char const *content_type;
+  byte *content;
+  usz length;
+  void (*content_free) (void *);
+};
+
+typedef void (*http_handler) (struct http_request const *request,
+                              struct http_reply *reply);
+
+/* Registers a handler before http_listen; the route table is read-only once
+ * listening starts. Returns 0 on success. */
+int http_route (int methods, char const *path, http_handler handler);
+
+/* Look up a capture by slug name, e.g. the "id" of "/user/{id}". Returns null
+ * when absent. The value is not null-terminated; use *length. */
+char const *http_capture (struct http_request const *request,
+                          char const *name, usz *length);
 
 struct http_response
 {
