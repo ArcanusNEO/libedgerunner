@@ -5,14 +5,14 @@ SRC := $(shell find . -path ./src -prune -o -type f -name "*.c" -print)
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
-EXT := cmacs.h include/grimoire.h lib/libcaster.a include/pcre2.h lib/libpcre2-8.a include/uv.h lib/libuv.a include/llhttp.h lib/libllhttp.a include/r3/r3.h lib/libr3.a extern/yyjson.h extern/yyjson.c
+EXT := cmacs.h include/grimoire.h lib/libcaster.a include/uv.h lib/libuv.a include/llhttp.h lib/libllhttp.a include/r3/r3.h lib/libr3.a include/pcre2.h lib/libpcre2-8.a  extern/yyjson.h extern/yyjson.c
 WGET := wget -qc --show-progress -t 3 --waitretry=3
 
 CFLAGS ?= -O3 -fno-plt -pipe -flto=auto
 CFLAGS += -D_GNU_SOURCE=1 -pthread -D_REENTRANT -fwrapv -fms-extensions -Wall -Wvla -Wno-parentheses -Wno-microsoft -I$(CURDIR) -I$(CURDIR)/extern -I$(CURDIR)/include
 LDFLAGS ?= -Wl,-O1
 LDFLAGS += -L$(CURDIR)/lib
-LDLIBS += -lm -lpthread -l:libcaster.a -l:libpcre2-8.a -l:libuv.a -l:libllhttp.a -l:libr3.a
+LDLIBS += -lm -lpthread -l:libcaster.a -l:libuv.a -l:libllhttp.a -l:libr3.a -l:libpcre2-8.a
 
 all: main
 
@@ -43,21 +43,6 @@ include/grimoire.h lib/libcaster.a&:
 	cd src/libcaster && \
 	$(MAKE) && \
 	$(MAKE) install prefix=$(CURDIR)
-
-include/pcre2.h lib/libpcre2-8.a&:
-	@$(WGET) -O pcre2.tar.gz https://api.github.com/repos/PCRE2Project/pcre2/tarball || ($(RM) pcre2.tar.gz && false)
-	install -d src/pcre2
-	@tar -xf pcre2.tar.gz -C src/pcre2 --strip-components=1
-	@$(RM) pcre2.tar.gz
-	cd src/pcre2 && \
-	./autogen.sh && \
-	./configure \
-		--prefix=$(CURDIR) \
-		--disable-shared \
-		--enable-static \
-		--disable-dependency-tracking && \
-	$(MAKE) && \
-	$(MAKE) install
 
 include/uv.h lib/libuv.a&:
 	@$(WGET) -O libuv.tar.gz https://api.github.com/repos/libuv/libuv/tarball || ($(RM) libuv.tar.gz && false)
@@ -102,6 +87,21 @@ include/r3/r3.h lib/libr3.a&:
 		--disable-debug \
 		--disable-gcov \
 		--without-malloc && \
+	$(MAKE) && \
+	$(MAKE) install
+
+include/pcre2.h lib/libpcre2-8.a&:
+	@$(WGET) -O pcre2.tar.gz https://api.github.com/repos/PCRE2Project/pcre2/tarball || ($(RM) pcre2.tar.gz && false)
+	install -d src/pcre2
+	@tar -xf pcre2.tar.gz -C src/pcre2 --strip-components=1
+	@$(RM) pcre2.tar.gz
+	cd src/pcre2 && \
+	./autogen.sh && \
+	./configure \
+		--prefix=$(CURDIR) \
+		--disable-shared \
+		--enable-static \
+		--disable-dependency-tracking && \
 	$(MAKE) && \
 	$(MAKE) install
 
