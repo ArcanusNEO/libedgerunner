@@ -40,7 +40,7 @@ include/grimoire.h lib/libcaster.a&:
 	install -d src/libcaster
 	@tar -xf libcaster.tar.gz -C src/libcaster --strip-components=1
 	@$(RM) libcaster.tar.gz
-	cd src/libcaster && make -j2 && make install prefix=$(CURDIR)
+	cd src/libcaster && $(MAKE) && $(MAKE) install prefix=$(CURDIR)
 
 include/uv.h lib/libuv.a&:
 	@$(WGET) -O libuv.tar.gz https://api.github.com/repos/libuv/libuv/tarball || ($(RM) libuv.tar.gz && false)
@@ -53,7 +53,7 @@ include/uv.h lib/libuv.a&:
 		--disable-shared \
 		--enable-static \
 		--disable-dependency-tracking
-	cd src/libuv && make -j2 && make install
+	cd src/libuv && $(MAKE) && $(MAKE) install
 
 include/llhttp.h lib/libllhttp.a&:
 	@$(WGET) -O llhttp.tar.gz https://api.github.com/repos/nodejs/llhttp/tarball || ($(RM) llhttp.tar.gz && false)
@@ -61,7 +61,7 @@ include/llhttp.h lib/libllhttp.a&:
 	@tar -xf llhttp.tar.gz -C src/llhttp --strip-components=1
 	@$(RM) llhttp.tar.gz
 	cd src/llhttp && npm i
-	cd src/llhttp && make -j2 && make install PREFIX=$(CURDIR)
+	cd src/llhttp && $(MAKE) && $(MAKE) install PREFIX=$(CURDIR)
 
 include/r3/r3.h lib/libr3.a&:
 	@$(WGET) -O r3.tar.gz https://api.github.com/repos/c9s/r3/tarball || ($(RM) r3.tar.gz && false)
@@ -80,7 +80,7 @@ include/r3/r3.h lib/libr3.a&:
 		--disable-debug \
 		--disable-gcov \
 		--without-malloc
-	cd src/r3 && make -j2 && make install
+	cd src/r3 && $(MAKE) && $(MAKE) install
 
 extern/yyjson.h extern/yyjson.c&:
 	install -d extern
