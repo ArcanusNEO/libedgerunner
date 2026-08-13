@@ -6,11 +6,6 @@ static char *H1_RESPONSE_400 = "HTTP/1.1 " HTTP_CODE_400 "\r\n"
                                "Content-Length: 11\r\n"
                                "\r\n"
                                "Bad Request";
-static char *H1_RESPONSE_404 = "HTTP/1.1 " HTTP_CODE_404 "\r\n"
-                               "Connection: close\r\n"
-                               "Content-Length: 9\r\n"
-                               "\r\n"
-                               "Not Found";
 
 static void
 free_header (struct http_client *client)
@@ -419,12 +414,9 @@ init_static ()
   llhttp_settings.on_header_field = on_header_field;
   llhttp_settings.on_header_value = on_header_value;
   llhttp_settings.on_headers_complete = on_headers_complete;
-  llhttp_settings.on_url_complete = on_url_complete;
   llhttp_settings.on_body = on_body;
   llhttp_settings.on_message_complete = on_message_complete;
   inited = true;
-
-  (void)H1_RESPONSE_404;
 }
 
 static int
