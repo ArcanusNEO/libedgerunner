@@ -7,9 +7,9 @@
 
 !Makefile
 
-!include
-!src
-!test
+extern
+include
+src
 !*.h
 cmacs.h
 !*.c
