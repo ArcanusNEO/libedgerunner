@@ -138,6 +138,7 @@ on_message_complete (llhttp_t *parser)
   if (!body)
     return HPE_USER;
   client->body = body;
+  /* TODO: route the request */
   char header[] = HTTP_CODE_200 H1_EOL;
   return http_response (client, header, body->store, body->size);
 }
@@ -292,7 +293,6 @@ on_url_complete (llhttp_t *parser)
   if (!url)
     return HPE_USER;
   client->url = url;
-  /* TODO: route the request */
   clogger (DEBUG, (char *)url->store);
   return HPE_OK;
 }
