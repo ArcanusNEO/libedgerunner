@@ -5,7 +5,7 @@ SRC := $(shell find . -path ./src -prune -o -type f -name "*.c" -print)
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
-EXT := cmacs.h extern/yyjson.h extern/yyjson.c include/r3/r3.h lib/libr3.a
+EXT := cmacs.h include/llhttp.h lib/libllhttp.a extern/yyjson.h extern/yyjson.c include/r3/r3.h lib/libr3.a
 WGET := wget -qc --show-progress -t 3 --waitretry=3
 
 CFLAGS ?= -O3 -fno-plt -pipe -flto=auto
@@ -34,6 +34,14 @@ extern: $(EXT)
 
 cmacs.h:
 	@$(WGET) -O $@ https://raw.github.com/ArcanusNEO/cmacs/master/cmacs.h || ($(RM) $@ && false)
+
+include/llhttp.h lib/libllhttp.a&:
+	@$(WGET) -O llhttp.tar.gz https://api.github.com/repos/nodejs/llhttp/tarball || ($(RM) llhttp.tar.gz && false)
+	install -d src/llhttp
+	@tar -xf llhttp.tar.gz -C src/llhttp --strip-components=1
+	@$(RM) llhttp.tar.gz
+	cd src/llhttp && npm i
+	cd src/llhttp && make -j2 && make install PREFIX=$(CURDIR)
 
 extern/yyjson.h extern/yyjson.c&:
 	install -d extern
