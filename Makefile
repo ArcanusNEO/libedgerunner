@@ -5,7 +5,7 @@ SRC := $(shell find . -path ./src -prune -o -type f -name "*.c" -print)
 OBJ := $(patsubst %.c, %.o, $(SRC))
 DEP := $(patsubst %.c, %.d, $(SRC))
 
-EXT := cmacs.h extern/yyjson.h extern/yyjson.c include/r3/r3.h
+EXT := cmacs.h extern/yyjson.h extern/yyjson.c include/r3/r3.h lib/libr3.a
 WGET := wget -qc --show-progress -t 3 --waitretry=3
 
 CFLAGS ?= -O3 -fno-plt -pipe -flto=auto
@@ -38,7 +38,7 @@ extern/yyjson.h extern/yyjson.c&:
 	install -d extern
 	@$(WGET) -P extern https://raw.github.com/ibireme/yyjson/master/src/yyjson.{h,c} || ($(RM) $@ && false)
 
-include/r3/r3.h:
+include/r3/r3.h lib/libr3.a&:
 	@$(WGET) -O r3.tar.gz https://api.github.com/repos/c9s/r3/tarball || ($(RM) r3.tar.gz && false)
 	install -d src/r3
 	@tar -xf r3.tar.gz -C src/r3 --strip-components=1
