@@ -50,6 +50,7 @@ include/pcre2.h lib/libpcre2-8.a&:
 	@tar -xf pcre2.tar.gz -C src/pcre2 --strip-components=1
 	@$(RM) pcre2.tar.gz
 	cd src/pcre2 && \
+	./autogen.sh && \
 	./configure \
 		--prefix=$(CURDIR) \
 		--disable-shared \
