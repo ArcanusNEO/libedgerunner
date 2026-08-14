@@ -12,7 +12,7 @@ CFLAGS ?= -O3 -fno-plt -pipe -flto=auto
 CFLAGS += -D_GNU_SOURCE=1 -pthread -D_REENTRANT -fwrapv -fms-extensions -Wall -Wvla -Wno-parentheses -Wno-microsoft -I$(CURDIR) -I$(CURDIR)/extern -I$(CURDIR)/include
 LDFLAGS ?= -Wl,-O1
 LDFLAGS += -L$(CURDIR)/lib
-LDLIBS += -l:libcaster.a -l:libuv.a -l:libllhttp.a -l:libr3.a -l:libpcre2-8.a -lcurl -lm -lpthread
+LDLIBS += -l:libcaster.a -l:libuv.a -l:libllhttp.a -l:libr3.a -l:libpcre2-8.a -lpq -lcurl -lm -lpthread
 
 all: main
 
